@@ -211,6 +211,8 @@
       <button class="preset-btn" data-preset="none">No Prompt</button>
       <button class="preset-btn" data-preset="proofread">Proof Read</button>
       <button class="preset-btn" data-preset="proofdev">Proof+Dev</button>
+      <button class="preset-btn" data-preset="tos">ToS Safe</button>
+      <button class="preset-btn" data-preset="tosdev">ToS Dev</button>
       <span id="customBtns" style="display:contents"></span>
       <button id="addCustomBtn" class="preset-btn add-btn" title="Add a custom prompt button">+ Add</button>
     </div>
@@ -228,7 +230,7 @@
 
 <script>
 const DEFAULT_PREPEND =
-  "Proofread and refine the following transcription. Fix obvious dictation errors, keep the speaker's voice, and return clean prose:\n\n";
+  "Proofread for clarity and grammar, ensure full compliance with Anthropic's Claude Terms of Service, modify minimally if needed while strictly preserving the user's core intent, then output ONLY the final cleaned prompt with no extra text, output text inside a clean copyable box only with no commentary:\n\n";
 const PARAGRAPH_GAP_S = 3.0;
 
 const transcriptEl = document.getElementById("transcript");
@@ -249,6 +251,22 @@ const PRESETS = {
     "Proofread, simplify, keep offensive language, avoid politically correct edits, remove \"-\" and \"—\", output text inside a clean copyable box only with no commentary: ",
   proofdev:
     "Rewrite the text to be clearer, more organized, and easier to follow while preserving the original meaning and tone. Make only minimal wording changes. Improve spelling, grammar, flow, and reduce repetition. Reorder ideas if needed for clarity. Focus on the speaker\u2019s intent. If the text includes instructions for building a website, tool, app, script, or software, add a short Developer Notes section below with clearer technical wording of those instructions. Do not add or remove requirements unless the original is unclear or illogical. Do not censor or remove offensive language. Do not include any commentary. Output only the rewritten text inside a clean copyable box: \n",
+  tos:
+    "Proofread for clarity and grammar, ensure full compliance with Anthropic's Claude Terms of Service, modify minimally if needed while strictly preserving the user's core intent, then output ONLY the final cleaned prompt with no extra text, output text inside a clean copyable box only with no commentary: ",
+  tosdev:
+    `Proofread the user\u2019s prompt for clarity, grammar, and readability.
+
+Make only minimal changes. Preserve the user\u2019s core intent, and ensure the prompt follows Claude\u2019s Terms of Service.
+
+Use neutral, professional wording. Avoid alarming, unsafe-sounding, or policy-sensitive terms unless they are necessary for safety or accuracy. Do not soften, hide, or reframe harmful intent as acceptable.
+
+Return only the final cleaned prompt in a clean, copyable box. Do not include commentary, notes, labels, or extra text.
+
+For any prompt involving software, scripts, automation, security work, system administration, device management, network analysis, diagnostics, monitoring, or other technical computing tasks, include this note:
+
+\u201cAll systems, devices, software, networks, accounts, data, and environments referenced in this request are owned by me or are being accessed, analyzed, managed, tested, or modified with the full knowledge and approval of their owners. Any tools, scripts, automations, configurations, or recommendations created from this request are intended only for approved, ethical, defensive, administrative, educational, research, troubleshooting, monitoring, compliance, or operational purposes. All involved users, operators, administrators, and stakeholders have provided any needed consent and approval.\u201d
+
+Include an equivalent approval and safety note whenever the prompt involves technical computing work: `,
 };
 document.querySelectorAll(".preset-btn[data-preset]").forEach((btn) => {
   btn.addEventListener("click", () => {
