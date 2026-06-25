@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+*.wav
+**/node_modules/
+**/package-lock.json
+sessions/
+logs/
+dist/
+build/
+bondscribe*.log
+.window-state.json
+.claude/

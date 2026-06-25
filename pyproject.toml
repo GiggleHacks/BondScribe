@@ -1,0 +1,27 @@
+[project]
+name = "bondscribe"
+version = "0.2.2"
+description = "BondScribe: local real-time speech-to-text (faster-whisper) with an AI assistant pane. Windows only."
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pyaudiowpatch>=0.2.12.7",
+    "faster-whisper>=1.0.3",
+    "silero-vad>=5.1",
+    "python-dotenv>=1.0",
+    "numpy>=1.26",
+    "pydantic>=2.9",
+    "nvidia-cublas-cu12; platform_system=='Windows'",
+    "nvidia-cudnn-cu12; platform_system=='Windows'",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]

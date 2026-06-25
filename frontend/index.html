@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BondScribe</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1f2630;
+    --border: #2a313c;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #5aa6ff;
+    --accent-2: #b47bff;
+    --flash: #3fb950;
+    --transcript-font: -apple-system, Segoe UI, Roboto, sans-serif;
+    --transcript-size: 17px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, Segoe UI, Roboto, sans-serif; overflow-x: hidden; }
+  #app { display: flex; flex-direction: column; height: 100vh; overflow-x: hidden; }
+  header { padding: 10px 14px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--panel), #1a2030);
+    display: flex; align-items: center; gap: 10px; }
+  header h2 { background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted); }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2);
+    color: var(--muted); }
+  .pill.live::before { content: "● "; color: #3fb950; }
+  .pill.offline::before { content: "● "; color: #f85149; }
+  .pill.toast { background: var(--flash); color: #0a0d12; font-weight: 600;
+    transition: opacity .4s; }
+
+  #meter { width: 120px; height: 8px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 999px; overflow: hidden;
+    position: relative; }
+  #meterFill { height: 100%; width: 0%;
+    background: linear-gradient(90deg, #3fb950 0%, #e3b341 70%, #f85149 100%);
+    transition: width .08s linear; }
+  #pauseBtn { background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); width: 28px; height: 28px; padding: 0;
+    border-radius: 50%; cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; flex-shrink: 0; }
+  #pauseBtn svg { display: block; }
+  #pauseBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #pauseBtn.paused { background: #f85149; color: #fff; border-color: #f85149; }
+
+
+  #promptBar { padding: 8px 14px; border-bottom: 1px solid var(--border);
+    background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
+  #promptBar .label { font-size: 11px; color: var(--muted); letter-spacing: .04em;
+    text-transform: uppercase; }
+  #prependPrompt { width: 100%; min-height: 120px; resize: vertical;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 10px;
+    font: 13px/1.45 ui-monospace, Consolas, monospace; }
+  .preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .preset-btn { background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer; }
+  .preset-btn:hover { filter: brightness(1.2); border-color: var(--accent); }
+  .custom-btn.empty { opacity: 0.65; font-style: italic; }
+  .add-btn { border-style: dashed; color: var(--muted); }
+  .add-btn:hover { color: var(--accent); }
+
+  .modal-backdrop, #modalBackdrop { position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); display: none; align-items: center;
+    justify-content: center; z-index: 100; }
+  .modal-backdrop.open, #modalBackdrop.open { display: flex; }
+  .modal-card, #modal { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px; width: min(520px, 92vw);
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.5); }
+  .modal-card h3, #modal h3 { margin: 0; font-size: 14px; color: var(--text); }
+  .modal-card label, #modal label { font-size: 11px; color: var(--muted);
+    letter-spacing: .04em; text-transform: uppercase; }
+  .modal-card input, .modal-card textarea, .modal-card select,
+  #modal input, #modal textarea {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px;
+    font: 13px/1.45 ui-monospace, Consolas, monospace; width: 100%; }
+  #modal textarea { min-height: 140px; resize: vertical; }
+  .modal-card .actions, #modal .actions { display: flex; gap: 8px;
+    justify-content: flex-end; margin-top: 4px; }
+  .modal-card button, #modal button { background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; cursor: pointer; }
+  .modal-card button.primary, #modal button.primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; }
+  .modal-card button:hover, #modal button:hover { filter: brightness(1.2); }
+  .modal-card input[type=range] { padding: 0; }
+
+  #transcript {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 22px 28px;
+    font-family: var(--transcript-font); font-size: var(--transcript-size);
+    line-height: 1.65; user-select: text;
+  }
+  .para { margin: 0 0 14px 0; padding: 2px 4px; border-radius: 4px; }
+  .para::selection, .para *::selection { background: var(--accent); color: #fff; }
+  .para .t { color: var(--muted); font-size: 11px; margin-right: 8px;
+    font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+  .para .interim { color: var(--muted); font-style: italic; }
+  .para .interim::after { content: "…"; opacity: .6; }
+
+  footer { padding: 8px 14px; border-top: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--panel-2), #242b3a);
+    display: flex; gap: 10px; align-items: center; }
+  .icon-btn { background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); width: 30px; height: 28px; padding: 0;
+    border-radius: 6px; font-size: 15px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.15); }
+  .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  #modelPicker {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    outline: none;
+  }
+  #modelPicker:disabled {
+    opacity: .5;
+    cursor: progress;
+  }
+  #modelPicker option {
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  @keyframes flash {
+    0%   { background: var(--flash); }
+    100% { background: transparent; }
+  }
+  .flash { animation: flash .45s ease-out; }
+
+  /* Sleek scrollbars matching the app theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
+
+</style>
+</head>
+<body>
+<div id="settingsBackdrop" class="modal-backdrop">
+  <div class="modal-card">
+    <h3>Settings</h3>
+    <label for="settingsFont">Font</label>
+    <select id="settingsFont">
+      <option value="-apple-system, Segoe UI, Roboto, sans-serif">System Sans</option>
+      <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
+      <option value="ui-monospace, Consolas, 'Courier New', monospace">Monospace</option>
+      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Segoe UI', Tahoma, sans-serif">Segoe UI</option>
+      <option value="'Inter', system-ui, sans-serif">Inter</option>
+    </select>
+    <label for="settingsSize">Font size: <span id="settingsSizeVal">17</span>px</label>
+    <input id="settingsSize" type="range" min="12" max="28" step="1" />
+    <div class="actions">
+      <button id="settingsReset">Reset</button>
+      <button id="settingsClose" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+<div id="modalBackdrop">
+  <div id="modal">
+    <h3 id="modalTitle">Edit Custom Prompt</h3>
+    <label for="modalLabel">Button label</label>
+    <input id="modalLabel" type="text" maxlength="24" />
+    <label for="modalPrompt">Prompt</label>
+    <textarea id="modalPrompt" placeholder="Enter your custom prompt" spellcheck="false"></textarea>
+    <div class="actions">
+      <button id="modalDelete" style="margin-right:auto;border-color:#f85149;color:#f85149">Delete</button>
+      <button id="modalCancel">Cancel</button>
+      <button id="modalSave" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+<div id="app">
+  <header>
+    <button id="pauseBtn" title="Pause audio capture (Ctrl+Space)"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+    <div id="meter" title="Microphone level"><div id="meterFill"></div></div>
+    <span id="toast" class="pill toast" style="display:none">copied</span>
+  </header>
+  <div id="promptBar">
+    <span class="label">Refinement prompt (prepended to selection on copy)</span>
+    <textarea id="prependPrompt" spellcheck="false"></textarea>
+    <div class="preset-row">
+      <button class="preset-btn" data-preset="none">No Prompt</button>
+      <button class="preset-btn" data-preset="proofread">Proof Read</button>
+      <button class="preset-btn" data-preset="proofdev">Proof+Dev</button>
+      <span id="customBtns" style="display:contents"></span>
+      <button id="addCustomBtn" class="preset-btn add-btn" title="Add a custom prompt button">+ Add</button>
+    </div>
+  </div>
+  <div id="transcript"></div>
+  <footer>
+    <button id="clearBtn">Clear</button>
+    <button id="logsBtn" class="icon-btn" title="Open logs folder"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v9a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3H3a1 1 0 00-1 1z"/></svg></button>
+    <button id="settingsBtn" class="icon-btn" title="Settings">⚙</button>
+    <select id="modelPicker" class="pill" title="Transcription speed / accuracy"></select>
+    <span id="modelBadge" class="pill"></span>
+    <span id="versionLabel" style="margin-left:auto;font-size:10px;color:var(--muted);opacity:.6;letter-spacing:.04em;"></span>
+  </footer>
+</div>
+
+<script>
+const DEFAULT_PREPEND =
+  "Proofread and refine the following transcription. Fix obvious dictation errors, keep the speaker's voice, and return clean prose:\n\n";
+const PARAGRAPH_GAP_S = 3.0;
+
+const transcriptEl = document.getElementById("transcript");
+const toastEl = document.getElementById("toast");
+const clearBtn = document.getElementById("clearBtn");
+const prependPrompt = document.getElementById("prependPrompt");
+
+// --- Prepend prompt persistence ---
+prependPrompt.value = localStorage.getItem("prependPrompt") || DEFAULT_PREPEND;
+prependPrompt.addEventListener("input", () => {
+  localStorage.setItem("prependPrompt", prependPrompt.value);
+});
+
+// --- Preset prompt buttons ---
+const PRESETS = {
+  none: "",
+  proofread:
+    "Proofread, simplify, keep offensive language, avoid politically correct edits, remove \"-\" and \"—\", output text inside a clean copyable box only with no commentary: ",
+  proofdev:
+    "Rewrite the text to be clearer, more organized, and easier to follow while preserving the original meaning and tone. Make only minimal wording changes. Improve spelling, grammar, flow, and reduce repetition. Reorder ideas if needed for clarity. Focus on the speaker\u2019s intent. If the text includes instructions for building a website, tool, app, script, or software, add a short Developer Notes section below with clearer technical wording of those instructions. Do not add or remove requirements unless the original is unclear or illogical. Do not censor or remove offensive language. Do not include any commentary. Output only the rewritten text inside a clean copyable box: \n",
+};
+document.querySelectorAll(".preset-btn[data-preset]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const p = PRESETS[btn.dataset.preset];
+    if (p === undefined) return; // allow "" (No Prompt) to clear the box
+    prependPrompt.value = p;
+    localStorage.setItem("prependPrompt", p);
+  });
+});
+
+// --- Custom prompt buttons ---
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalLabel = document.getElementById("modalLabel");
+const modalPrompt = document.getElementById("modalPrompt");
+const modalSave = document.getElementById("modalSave");
+const modalCancel = document.getElementById("modalCancel");
+const modalDelete = document.getElementById("modalDelete");
+const customBtns = document.getElementById("customBtns");
+const addCustomBtn = document.getElementById("addCustomBtn");
+let modalSlot = null;
+
+function customKey(slot) { return `customPrompt_${slot}`; }
+function customLabelKey(slot) { return `customLabel_${slot}`; }
+
+// --- Custom slot list (which custom buttons exist, in order) ---
+function loadSlots() {
+  try {
+    const raw = localStorage.getItem("customSlots");
+    if (raw) { const a = JSON.parse(raw); if (Array.isArray(a)) return a; }
+  } catch (_) {}
+  return [1, 2, 3]; // migrate existing three custom buttons
+}
+function saveSlots(slots) {
+  localStorage.setItem("customSlots", JSON.stringify(slots));
+}
+function nextSlotId(slots) {
+  return slots.reduce((m, s) => Math.max(m, Number(s) || 0), 0) + 1;
+}
+
+function loadCustom(slot) {
+  return {
+    label: localStorage.getItem(customLabelKey(slot)) || `Custom ${slot}`,
+    prompt: localStorage.getItem(customKey(slot)) || "",
+  };
+}
+
+function refreshCustomButton(btn) {
+  const slot = btn.dataset.custom;
+  const { label, prompt } = loadCustom(slot);
+  btn.textContent = label;
+  btn.classList.toggle("empty", !prompt);
+}
+
+function openCustomModal(slot) {
+  modalSlot = slot;
+  const { label, prompt } = loadCustom(slot);
+  modalLabel.value = label;
+  modalPrompt.value = prompt;
+  modalDelete.style.display = "inline-block";
+  modalBackdrop.classList.add("open");
+  setTimeout(() => modalPrompt.focus(), 0);
+}
+
+function closeCustomModal() {
+  modalBackdrop.classList.remove("open");
+  modalSlot = null;
+}
+
+modalCancel.addEventListener("click", closeCustomModal);
+modalBackdrop.addEventListener("click", (e) => {
+  if (e.target === modalBackdrop) closeCustomModal();
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && modalBackdrop.classList.contains("open")) closeCustomModal();
+});
+
+modalSave.addEventListener("click", () => {
+  if (!modalSlot) return;
+  const label = modalLabel.value.trim() || `Custom ${modalSlot}`;
+  const prompt = modalPrompt.value;
+  localStorage.setItem(customLabelKey(modalSlot), label);
+  localStorage.setItem(customKey(modalSlot), prompt);
+  renderCustomButtons();
+  if (prompt) {
+    prependPrompt.value = prompt;
+    localStorage.setItem("prependPrompt", prompt);
+  }
+  closeCustomModal();
+});
+
+modalDelete.addEventListener("click", () => {
+  if (!modalSlot) return;
+  localStorage.removeItem(customKey(modalSlot));
+  localStorage.removeItem(customLabelKey(modalSlot));
+  saveSlots(loadSlots().filter((s) => String(s) !== String(modalSlot)));
+  renderCustomButtons();
+  closeCustomModal();
+});
+
+// Build the custom buttons from the slot list (re-runnable).
+function renderCustomButtons() {
+  customBtns.innerHTML = "";
+  loadSlots().forEach((slot) => {
+    const btn = document.createElement("button");
+    btn.className = "preset-btn custom-btn";
+    btn.dataset.custom = slot;
+    btn.title = "Click to apply · Right-click to edit";
+    refreshCustomButton(btn);
+    btn.addEventListener("click", () => {
+      const { prompt } = loadCustom(slot);
+      if (!prompt) {
+        openCustomModal(slot);
+      } else {
+        prependPrompt.value = prompt;
+        localStorage.setItem("prependPrompt", prompt);
+      }
+    });
+    btn.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openCustomModal(slot);
+    });
+    customBtns.appendChild(btn);
+  });
+}
+
+addCustomBtn.addEventListener("click", () => {
+  const slots = loadSlots();
+  const id = nextSlotId(slots);
+  slots.push(id);
+  saveSlots(slots);
+  renderCustomButtons();
+  openCustomModal(id);
+});
+
+renderCustomButtons();
+
+// --- Clipboard ---
+function copyToClipboard(text) {
+  if (!text) return false;
+  let ok = false;
+  try { window.postMessage({ type: 'copy', text }, '*'); ok = true; } catch (_) {}
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    ok = true;
+  }
+  return ok;
+}
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.style.display = "inline-block";
+  toastEl.style.opacity = "1";
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => {
+    toastEl.style.opacity = "0";
+    setTimeout(() => { toastEl.style.display = "none"; }, 400);
+  }, 900);
+}
+
+// --- Live transcript via WebSocket ---
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws/transcript`);
+  ws.onopen = () => {};
+  ws.onclose = () => {
+    setTimeout(connectWS, 1500);
+  };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "segment" || msg.type === "interim") upsertSegment(msg);
+      else if (msg.type === "status") updateAudioStatus(msg);
+    } catch (_) {}
+  };
+  setInterval(() => { if (ws.readyState === 1) ws.send(""); }, 20_000);
+}
+
+function formatTime(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// --- Paragraph-style rendering ---
+// Finals by id land in `finalsById`. We re-render the "current" trailing
+// paragraph (everything after the last gap > PARAGRAPH_GAP_S) plus the interim
+// tail. Older paragraphs become immutable once closed.
+
+const finals = []; // ordered array of {id, t0, t1, text}
+const finalsById = new Map();
+let currentInterim = null; // {id, text}
+
+function upsertSegment(seg) {
+  const isInterim = seg.type === "interim" || seg.kind === "interim";
+  if (isInterim) {
+    currentInterim = { id: seg.id, text: seg.text };
+  } else {
+    const existing = finalsById.get(seg.id);
+    const rec = { id: seg.id, t0: seg.t0, t1: seg.t1, text: seg.text };
+    if (existing) {
+      Object.assign(existing, rec);
+    } else {
+      finals.push(rec);
+      finalsById.set(seg.id, rec);
+    }
+    // Drop interim once a final with the same id arrives.
+    if (currentInterim && currentInterim.id === seg.id) currentInterim = null;
+  }
+  render();
+}
+
+function groupIntoParagraphs() {
+  const paras = [];
+  let cur = null;
+  for (const f of finals) {
+    if (!cur) {
+      cur = { t0: f.t0, segs: [f] };
+    } else {
+      const gap = f.t0 - cur.segs[cur.segs.length - 1].t1;
+      if (gap > PARAGRAPH_GAP_S) {
+        paras.push(cur);
+        cur = { t0: f.t0, segs: [f] };
+      } else {
+        cur.segs.push(f);
+      }
+    }
+  }
+  if (cur) paras.push(cur);
+  return paras;
+}
+
+function render() {
+  const paras = groupIntoParagraphs();
+  const nearBottom = transcriptEl.scrollHeight - transcriptEl.scrollTop - transcriptEl.clientHeight < 140;
+
+  const parts = paras.map((p) => {
+    const body = p.segs.map((s) => escapeHtml(s.text.trim())).join(" ");
+    return `<p class="para">${body}</p>`;
+  });
+
+  if (currentInterim && currentInterim.text) {
+    if (parts.length) {
+      parts[parts.length - 1] = parts[parts.length - 1].replace(
+        /<\/p>$/,
+        ` <span class="interim">${escapeHtml(currentInterim.text.trim())}</span></p>`
+      );
+    } else {
+      parts.push(`<p class="para"><span class="interim">${escapeHtml(currentInterim.text.trim())}</span></p>`);
+    }
+  }
+
+  transcriptEl.innerHTML = parts.join("");
+  if (nearBottom) transcriptEl.scrollTop = transcriptEl.scrollHeight;
+}
+
+// --- Auto-copy on selection end (with prepend prompt) ---
+let pendingFlashNodes = [];
+
+function markSelectionForFlash() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  pendingFlashNodes = [];
+  transcriptEl.querySelectorAll(".para").forEach((el) => {
+    if (range.intersectsNode(el)) pendingFlashNodes.push(el);
+  });
+}
+
+transcriptEl.addEventListener("mousedown", () => { pendingFlashNodes = []; });
+transcriptEl.addEventListener("mouseup", () => {
+  setTimeout(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (!text) return;
+    markSelectionForFlash();
+    const prompt = prependPrompt.value || "";
+    const combined = prompt + text;
+    if (copyToClipboard(combined)) {
+      pendingFlashNodes.forEach((n) => {
+        n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash");
+      });
+      showToast("copied with prompt");
+    }
+  }, 0);
+});
+
+// --- Pause + audio level meter ---
+const pauseBtn = document.getElementById("pauseBtn");
+const meterFill = document.getElementById("meterFill");
+let isPaused = false;
+
+const PAUSE_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+const PLAY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5l12 7-12 7z"/></svg>';
+
+function setPausedUI(paused) {
+  isPaused = paused;
+  pauseBtn.innerHTML = paused ? PLAY_ICON : PAUSE_ICON;
+  pauseBtn.title = paused ? "Resume audio capture (Ctrl+Space)" : "Pause audio capture (Ctrl+Space)";
+  pauseBtn.classList.toggle("paused", paused);
+}
+
+function updateAudioStatus(msg) {
+  if (typeof msg.paused === "boolean" && msg.paused !== isPaused) setPausedUI(msg.paused);
+  // Map RMS (usually 0..0.3 for speech) to 0..100% with a gentle curve.
+  const lvl = Math.min(1, Math.pow(Math.max(0, msg.level || 0) * 4, 0.7));
+  meterFill.style.width = (lvl * 100).toFixed(1) + "%";
+}
+
+async function togglePause() {
+  const next = !isPaused;
+  setPausedUI(next); // optimistic
+  try {
+    const res = await fetch("/api/audio/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: next }),
+    });
+    const data = await res.json();
+    setPausedUI(!!data.paused);
+  } catch (_) {
+    setPausedUI(!next); // revert on failure
+  }
+}
+
+pauseBtn.addEventListener("click", togglePause);
+window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "Space") {
+    e.preventDefault();
+    togglePause();
+  }
+});
+
+// --- Settings (font + size) ---
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsBackdrop = document.getElementById("settingsBackdrop");
+const settingsFont = document.getElementById("settingsFont");
+const settingsSize = document.getElementById("settingsSize");
+const settingsSizeVal = document.getElementById("settingsSizeVal");
+const settingsClose = document.getElementById("settingsClose");
+const settingsReset = document.getElementById("settingsReset");
+
+const DEFAULT_FONT = "-apple-system, Segoe UI, Roboto, sans-serif";
+const DEFAULT_SIZE = 17;
+
+function applySettings(font, size) {
+  document.documentElement.style.setProperty("--transcript-font", font);
+  document.documentElement.style.setProperty("--transcript-size", size + "px");
+  settingsSizeVal.textContent = String(size);
+}
+function loadSettings() {
+  const font = localStorage.getItem("settings.font") || DEFAULT_FONT;
+  const size = parseInt(localStorage.getItem("settings.size") || String(DEFAULT_SIZE), 10);
+  settingsFont.value = font;
+  settingsSize.value = String(size);
+  applySettings(font, size);
+}
+loadSettings();
+
+document.getElementById("logsBtn").addEventListener("click", () => fetch("/api/open-logs"));
+
+fetch("/api/version").then(r => r.json()).then(d => {
+  document.getElementById("versionLabel").textContent = "v" + d.version;
+}).catch(() => {});
+
+settingsBtn.addEventListener("click", () => settingsBackdrop.classList.add("open"));
+settingsClose.addEventListener("click", () => settingsBackdrop.classList.remove("open"));
+settingsBackdrop.addEventListener("click", (e) => {
+  if (e.target === settingsBackdrop) settingsBackdrop.classList.remove("open");
+});
+settingsFont.addEventListener("change", () => {
+  const size = parseInt(settingsSize.value, 10);
+  applySettings(settingsFont.value, size);
+  localStorage.setItem("settings.font", settingsFont.value);
+});
+settingsSize.addEventListener("input", () => {
+  const size = parseInt(settingsSize.value, 10);
+  applySettings(settingsFont.value, size);
+  localStorage.setItem("settings.size", String(size));
+});
+settingsReset.addEventListener("click", () => {
+  localStorage.removeItem("settings.font");
+  localStorage.removeItem("settings.size");
+  loadSettings();
+});
+
+// --- Persisted textarea height ---
+const savedPromptH = localStorage.getItem("ui.prependHeight");
+if (savedPromptH) prependPrompt.style.height = savedPromptH;
+new ResizeObserver(() => {
+  if (prependPrompt.style.height) {
+    localStorage.setItem("ui.prependHeight", prependPrompt.style.height);
+  }
+}).observe(prependPrompt);
+
+// --- Clear view ---
+clearBtn.addEventListener("click", () => {
+  finals.length = 0;
+  finalsById.clear();
+  currentInterim = null;
+  transcriptEl.innerHTML = "";
+});
+
+// --- Model picker (live switch, no restart) ---
+(function () {
+  const picker = document.getElementById("modelPicker");
+  const badge = document.getElementById("modelBadge");
+  let presetsLoaded = false;
+
+  function render(data) {
+    if (data.switching) {
+      badge.textContent = "switching…";
+      badge.title = "Loading the selected model…";
+    } else if (data.error) {
+      badge.textContent = `${data.final} (${data.device})`;
+      badge.title = `Switch failed: ${data.error}`;
+    } else {
+      badge.textContent = `${data.final} (${data.device})`;
+      badge.title = `Final: ${data.final} | Interim: ${data.interim} | Device: ${data.device}`;
+    }
+  }
+
+  function refresh() {
+    fetch("/api/model")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.device === "unknown") { setTimeout(() => refresh(), 2000); return; }
+        if (!presetsLoaded && Array.isArray(data.presets) && data.presets.length) {
+          picker.innerHTML = "";
+          data.presets.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.key;
+            opt.textContent = p.label;
+            opt.title = p.description;
+            picker.appendChild(opt);
+          });
+          presetsLoaded = true;
+        }
+        if (data.preset && !data.switching) picker.value = data.preset;
+        picker.disabled = !!data.switching;
+        render(data);
+        if (data.switching) setTimeout(() => refresh(), 1000);
+      })
+      .catch(() => setTimeout(() => refresh(), 2000));
+  }
+
+  picker.addEventListener("change", () => {
+    const preset = picker.value;
+    picker.disabled = true;
+    badge.textContent = "switching…";
+    fetch("/api/model", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preset }),
+    })
+      .then(r => r.json())
+      .then(() => setTimeout(() => refresh(), 800))
+      .catch(() => { picker.disabled = false; refresh(); });
+  });
+
+  refresh();
+})();
+
+connectWS();
+</script>
+</body>
+</html>

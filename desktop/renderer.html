@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BondScribe</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0e1116; color: #e6edf3;
+    font: 13px -apple-system, Segoe UI, Roboto, sans-serif; overflow: hidden; }
+  #wrap { display: flex; height: 100vh; width: 100vw; }
+  .pane { min-width: 100px; min-height: 80px; display: flex; flex-direction: column;
+    background: #0e1116; position: relative; }
+  .pane webview { flex: 1; width: 100%; border: none; }
+  .pane .label { position: absolute; top: 6px; right: 10px; font-size: 10px;
+    font-weight: 700; letter-spacing: .08em; color: #8b949e;
+    background: rgba(14,17,22,.65); padding: 2px 6px; border-radius: 3px;
+    pointer-events: none; z-index: 2; text-transform: uppercase; }
+
+  #leftPane    { flex: 0 0 40%; }
+  #chatgptPane { flex: 1 1 0; }
+
+  #aiShortcuts { display: flex; gap: 6px; padding: 6px 8px 0 8px; background: #161b22;
+    align-items: center; }
+  .ai-shortcut { background: #1f2630; border: 1px solid #2a313c; border-radius: 4px;
+    width: 28px; height: 26px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; padding: 0; }
+  .ai-shortcut:hover { background: #263040; border-color: #4f8cff; }
+  .ai-shortcut.active { border-color: #4f8cff; background: #263040; }
+  .ai-shortcut img { width: 16px; height: 16px; display: block; }
+
+  #navbar { display: flex; gap: 4px; padding: 6px 8px; background: #161b22;
+    border-bottom: 1px solid #2a313c; align-items: center; }
+  #navbar button { background: #1f2630; color: #e6edf3; border: 1px solid #2a313c;
+    border-radius: 4px; width: 28px; height: 26px; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0; }
+  #navbar button:hover:not(:disabled) { background: #263040; border-color: #4f8cff; }
+  #navbar button:disabled { opacity: 0.35; cursor: default; }
+  #urlBar { flex: 1; background: #0e1116; color: #e6edf3;
+    border: 1px solid #2a313c; border-radius: 4px; padding: 4px 10px;
+    font: 12px ui-monospace, Consolas, monospace; height: 26px; }
+  #urlBar:focus { outline: none; border-color: #4f8cff; box-shadow: 0 0 0 2px rgba(79,140,255,.25); }
+
+  .divider-v { width: 6px; cursor: col-resize; background: #2a313c; flex: 0 0 6px; }
+  .divider-v.dragging { background: #4f8cff; }
+
+  #sendAiBar { padding: 8px; background: #161b22; border-top: 1px solid #2a313c; }
+  #sendAiBtn { width: 100%; height: 44px; background: #4f8cff; color: #fff;
+    border: 1px solid #4f8cff; border-radius: 6px; font-size: 14px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+    transition: filter .15s, background .15s; }
+  #sendAiBtn:hover { filter: brightness(1.1); }
+  #sendAiBtn:active { filter: brightness(.9); }
+  #sendAiBtn.sending { background: #8b949e; border-color: #8b949e; }
+  #sendAiBtn.ok { background: #3fb950; border-color: #3fb950; }
+  #sendAiBtn.err { background: #f85149; border-color: #f85149; }
+
+  #loading { position: fixed; inset: 0; display: flex; align-items: center;
+    justify-content: center; background: rgba(14,17,22,.94); font-size: 14px;
+    color: #8b949e; z-index: 10; }
+  #loading.hidden { display: none; }
+  .spinner { display: inline-block; width: 14px; height: 14px;
+    border: 2px solid #4f8cff; border-top-color: transparent; border-radius: 50%;
+    animation: spin .8s linear infinite; margin-right: 10px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #dragMask { position: fixed; inset: 0; z-index: 15; display: none; background: transparent;
+    cursor: col-resize; }
+  #dragMask.active { display: block; }
+
+  #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #3fb950; color: #0a0d12; padding: 6px 14px; border-radius: 999px;
+    font-weight: 600; font-size: 12px; opacity: 0; pointer-events: none;
+    transition: opacity .25s; z-index: 20; }
+  #toast.show { opacity: 1; }
+
+  /* Sleek scrollbars matching the app theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0e1116;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a313c;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #8b949e;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <section class="pane" id="leftPane">
+    <webview id="left" src="about:blank" partition="persist:general-left"></webview>
+  </section>
+  <div class="divider-v" id="divider1"></div>
+  <section class="pane" id="chatgptPane">
+    <div id="aiShortcuts">
+      <button class="ai-shortcut" data-ai="chatgpt" data-url="https://chatgpt.com/" title="ChatGPT">
+        <img src="https://www.google.com/s2/favicons?sz=32&domain=chatgpt.com" alt="ChatGPT">
+      </button>
+      <button class="ai-shortcut" data-ai="gemini" data-url="https://gemini.google.com/" title="Gemini">
+        <img src="https://www.google.com/s2/favicons?sz=32&domain=gemini.google.com" alt="Gemini">
+      </button>
+      <button class="ai-shortcut" data-ai="claude" data-url="https://claude.ai/new" title="Claude">
+        <img src="https://www.google.com/s2/favicons?sz=32&domain=claude.ai" alt="Claude">
+      </button>
+    </div>
+    <div id="navbar">
+      <button id="navBack" title="Back">◀</button>
+      <button id="navForward" title="Forward">▶</button>
+      <button id="navReload" title="Reload">⟳</button>
+      <button id="navHome" title="Home (ChatGPT)">⌂</button>
+      <input id="urlBar" type="text" spellcheck="false" placeholder="https://…" />
+    </div>
+    <webview id="chatgpt" src="about:blank" partition="persist:chatgpt" allowpopups></webview>
+    <div id="sendAiBar">
+      <button id="sendAiBtn" title="Paste clipboard into the AI input and submit">Send to AI ▸</button>
+    </div>
+  </section>
+</div>
+<div id="dragMask"></div>
+<div id="loading"><span class="spinner"></span>Starting BondScribe backend…</div>
+<div id="toast">copied</div>
+<script src="./renderer.js"></script>
+</body>
+</html>
