@@ -36,6 +36,43 @@ That's the whole setup. There's nothing to install by hand.
 *(Tip: right-click `RunBondScribe.bat` → **Send to → Desktop (create shortcut)**
 to launch it from your Desktop.)*
 
+### Alternative: install with `git clone`
+
+Prefer the command line, or want to pull updates later with `git pull`? If you
+have [Git](https://git-scm.com/download/win) installed:
+
+1. Open **Command Prompt** (press `Win`, type `cmd`, hit Enter) and move to a
+   folder you can write to — for example your Documents:
+
+   ```cmd
+   cd %USERPROFILE%\Documents
+   ```
+
+2. Clone the repository and enter the folder:
+
+   ```cmd
+   git clone https://github.com/GiggleHacks/BondScribe.git
+   cd BondScribe
+   ```
+
+3. Start it:
+
+   ```cmd
+   RunBondScribe.bat
+   ```
+
+   (Or just double-click `RunBondScribe.bat` in the new `BondScribe` folder.)
+   The first run installs everything and downloads the speech model — see the
+   notes above.
+
+4. To update later, pull the newest version and run it again:
+
+   ```cmd
+   cd %USERPROFILE%\Documents\BondScribe
+   git pull
+   RunBondScribe.bat
+   ```
+
 ---
 
 ## Requirements
